@@ -1,0 +1,82 @@
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+VTK_MODULE_INIT(vtkInteractionStyle);
+//cylinder 圆柱
+#include"vtkSmartPointer.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+#include "vtkCylinderSource.h" 
+#include "vtkPolyDataMapper.h"
+#include "vtkActor.h"
+#include "vtkRenderer.h"
+#include "vtkProperty.h"
+
+int main()
+{
+	//vtkSmartPointer<vtkBMPReader>bmpReader = vtkSmartPointer<vtkBMPReader>::New();
+	//bmpReader->SetFileName("doling.bmp");
+	//vtkCylinderSource 派生自vtkPolyDataAlgorithm，生成多边形数据：PolyData(vtkPolyData)。
+	//vtkCylinderSource 主要是生成一个中心在渲染场景原点的柱体，柱体的长轴沿着Y轴
+	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
+	cylinder->SetHeight(3.0); //设置柱体的高
+	cylinder->SetRadius(1.0); //设置柱体横截面的半径
+	cylinder->SetResolution(5); //设置柱体横截面的等边多边形的边数，可以转动以下生成的柱体，看有几条棱
+
+	//vtkPolyDataMapper 渲染多边形几何数据(vtkPolyData)
+	//派生自类vtkMapper，将输入的数据转换为几何图元(点、线、多边形)进行渲染
+	vtkSmartPointer<vtkPolyDataMapper> cylinderMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	
+	//vtkPolyDataMapper::SetInputConnection()  VTK可视化管线的输入数据接口，对应的可视化管线输出数据的接口为GetOutputPort()；
+	cylinderMapper->SetInputConnection(cylinder->GetOutputPort());
+	
+	//本例要渲染柱体的数据类型是vtkPolyData，而通常待渲染的数据是以vtkProp的形式存在于渲染场景中，
+	//这时需要使用vtkProp子类，来进行转换：
+	//三维空间中渲染对象vtkProp子类：vtkActor(表达场景中的几何数据)和vtkVolume(表达场景中的体数据)；
+	//二维空间中的数据：vtkActor2D
+	//所以vtkActor 派生自vtkProp类，vtkActor也有以下的子类：
+	//1.vtkFollower：自动的更新方向信息以保持始终面向一个特定的相机
+	//2.vtkLODActor：可以自动改变自身的几何表达来实现需要达到的交互帧率
+	//3.vtkLODProp3D：通过从许多Mapper(可以是体数据的Mapper和几何数据的Mapper集合)中进行选择来实现交互
+	
+	//vtkProp子类负责确定渲染场景中对象的位置、大小和方向信息。其中Prop一词来源于戏剧里的“道具”，
+	//在VTK里表示的是渲染场景中可以看得到的对象
+	//Prop依赖于两个对象：一个是映射Mapper(vtkMapper)对象，负责存放数据和渲染信息，
+	//                    另一个是属性(vtkProperty)对象，负责控制颜色、不透明度等参数
+	
+	//vtkActor::SetMapper()——设置生成几何图元的Mapper。
+	//                     即连接一个Actor到可视化管线的末端(可视化管线的末端就是Mapper)。
+	vtkSmartPointer<vtkActor> cylinderActor = vtkSmartPointer<vtkActor>::New();
+	cylinderActor->SetMapper(cylinderMapper);
+
+	//vtkRenderer 负责管理场景的渲染过程：包括Prop，照相机(Camera)和光照(Light)都被集中在一个vtkRenderer对象中
+	//一个vtkRenderWindow中可以有多个vtkRenderer对象
+	//vtkRenderer可以渲染在窗口中不同的矩形区域中(即视口)
+	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+	
+	renderer->AddActor(cylinderActor);      //添加vtkProp类型的对象到渲染场景中
+	//还有许多SetBackground的细节知识点，我跳过了
+	renderer->SetBackground(0.1, 0.2, 0.4); //设置渲染场景的背景颜色（R、G、B），取值范围0.0-1.0
+
+	/*vtkSmartPointer<vtkProperty>cylinderProperty = vtkSmartPointer<vtkProperty>::New();
+	cylinderProperty -> SetColor(1.0, 0.0, 0.0);
+	cylinderActor->SetProperty(cylinderProperty);*/
+
+	//vtkRenderWindow 将操作系统（windows , linux等）与VTK渲染引擎连接到一起，
+	vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
+	renWin->AddRenderer(renderer); //加入vtkRenderer对象
+	renWin->SetSize(1000, 500);     //用于设置窗口的大小，以像素为单位。    
+	
+	//vtkRenderWindowInteractor 提供平台独立的响应鼠标、键盘和时钟事件的交互机制
+	vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	iren->SetRenderWindow(renWin); //SetRenderWindow(renWin)设置渲染窗口，消息是通过渲染窗口捕获到的，所以必须要给交互器对象设置渲染窗口
+	
+	//vtkInteractorStyleTrackballCamera 交互器样式的一种,该样式下，用户是通过控制相机对物体作旋转、放大、缩小等操作
+	vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+	iren->SetInteractorStyle(style); //定义交互器样式,默认的交互样式为vtkInteractorStyleSwitch
+	iren->Initialize();              //为处理窗口事件做准备，交互器工作之前必须先调用这个方法进行初始化。
+	iren->Start();                   //开始进入事件响应循环，交互器处于等待状态，等待用户交互事件的发生。
+	                                 //进入事件响应循环之前必须先调用Initialize()方法。
+	return 0;
+}
+
