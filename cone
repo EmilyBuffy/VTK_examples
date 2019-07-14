@@ -1,0 +1,222 @@
+/*=========================================================================
+
+  Program:   Visualization Toolkit
+  Module:    Cone6.cxx
+
+  Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+  All rights reserved.
+  See Copyright.txt or http://www.kitware.com/Copyright.htm for details.
+
+	 This software is distributed WITHOUT ANY WARRANTY; without even
+	 the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+	 PURPOSE.  See the above copyright notice for more information.
+
+=========================================================================*/
+//
+// This example introduces 3D widgets. 3D widgets take advantage of the
+// event/observer design pattern introduced previously. They typically
+// have a particular representation in the scene which can be interactively
+// selected and manipulated（操作） using the mouse and keyboard. As the widgets
+// are manipulated, they in turn invoke events such as StartInteractionEvent,
+// InteractionEvent, and EndInteractionEvent which can be used to manipulate
+// the scene that the widget is embedded in. 3D widgets work in the context
+// of the event loop which was set up in the previous example.
+//widget 小部件
+// Note: there are more 3D widget examples in VTK/Examples/GUI/.
+//
+//【】：根据英文原文，我对VTK的理解，会放在【】括号中，不具有权威性，理解有错欢迎指正
+
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+VTK_MODULE_INIT(vtkInteractionStyle);
+// First include the required header files for the VTK classes we are using.
+#include "vtkConeSource.h"
+#include "vtkPolyDataMapper.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkCamera.h"
+#include "vtkActor.h"
+#include "vtkRenderer.h"
+#include "vtkCommand.h"
+#include "vtkBoxWidget.h"
+#include "vtkTransform.h"
+#include "vtkInteractorStyleTrackballCamera.h"
+
+//
+// Similar to Cone2.cxx, we define a callback for interaction.
+//
+class vtkMyCallback : public vtkCommand
+{
+public:
+	static vtkMyCallback* New()
+	{
+		return new vtkMyCallback;
+	}
+	void Execute(vtkObject* caller, unsigned long, void*) override
+	{
+		vtkTransform* t = vtkTransform::New();
+		vtkBoxWidget* widget = reinterpret_cast<vtkBoxWidget*>(caller);
+		widget->GetTransform(t);
+		widget->GetProp3D()->SetUserTransform(t);
+		t->Delete();
+	}
+};
+
+int main()
+{
+	//
+	// Next we create an instance of vtkConeSource and set some of its
+	// properties. The instance of vtkConeSource "cone" is part of a
+	// visualization pipeline (it is a source process object); it produces data
+	// (output type is vtkPolyData) which other filters may process.
+	//现在创建一个vtkConeSource实例，并设置该实例的属性。实例“cone”是可视化管道的一部分（它是一个 数据源处理对象），实例产生数据
+	//	（数据类型：vtkPolyData）以供其他filters（过滤器）处理。
+	//
+	//vtkConeSource* cone = vtkConeSource::New();
+	vtkSmartPointer<vtkConeSource> cone = vtkSmartPointer<vtkConeSource>::New();
+	cone->SetHeight(3.0);      // 高
+	cone->SetRadius(1.0);      // 半径
+	cone->SetResolution(10);   // 设置椎体横截面的等边多边形的边数
+
+	//
+	// In this example we terminate the pipeline with a mapper process object.
+	// (Intermediate filters such as vtkShrinkPolyData could be inserted in
+	// between the source and the mapper.)  We create an instance of
+	// vtkPolyDataMapper to map the polygonal（多边形的） data into graphics primitives（图元）. We
+	// connect the output of the cone source to the input of this mapper.
+	//使用mapper process object 终结这个管道。 通过vtkPolyDataMapper实例（coneMapper）,将多边形数据映射（Map）
+	//成图元（graphics primitives（基元））。将cone source 的输出口与该mapper的输入口相连接
+	//【我的理解就是，VTK里产生的数据就像是放到一节节的管道里，不同管道对应不同的处理，不同的处理需要对应的不同的数据类型，
+	//这时需要将原始数据（source data)从一个管道传到另一个管道】
+	//
+	//vtkPolyDataMapper* coneMapper = vtkPolyDataMapper::New(); //【mapper就像舞台导演，规定演员的几何位置】
+	vtkSmartPointer<vtkPolyDataMapper> coneMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	coneMapper->SetInputConnection(cone->GetOutputPort());//【连接管道口】
+
+	//
+	// Create an actor to represent the cone. The actor orchestrates（把…协调地结合起来，精心安排） 
+	// rendering（渲染，表演，演奏） of the mapper's graphics primitives. An actor also refers to properties
+	// via a vtkProperty instance, and includes an internal transformation
+	// matrix. We set this actor's mapper to be coneMapper which we created
+	// above.
+	//创建一个actor 展示cone。Actor 把mapper's graphics primitives 当中的rendering协调的结合起来.
+	//这个actor 有自己的属性，可以通过创建vtkProperty实例实现属性，也可以调用其内部的transformation 矩阵。
+	//将上面创建的coneMapper设置为这个actor的mapper
+	//【上面mapper当中所存的数据，就像是舞台上的位置信息预设，接下来要出场的就是“演员了”，这个演员
+	//是我们观众肉眼可见的，这个演员会按照mapper的指示表演（rendering）。这个演员有自己的属性】
+	//
+
+	//vtkActor* coneActor = vtkActor::New();
+	vtkSmartPointer<vtkActor> coneActor = vtkSmartPointer<vtkActor>::New();
+	coneActor->SetMapper(coneMapper); //将coneMapper 分配给coneActor
+
+	//
+	// Create the Renderer and assign actors to it. A renderer is like a
+	// viewport. It is part or all of a window on the screen and it is
+	// responsible for drawing the actors it has.  We also set the background
+	// color here.
+	//【一个VTK窗口中可以有多个renderer,每个renderer管理多个actors，就像是经纪人ren1】
+	//
+	//vtkRenderer* ren1 = vtkRenderer::New();
+	vtkSmartPointer<vtkRenderer> ren1 = vtkSmartPointer<vtkRenderer>::New();
+	ren1->AddActor(coneActor);
+	ren1->SetBackground(0.1, 0.2, 0.4); //背景设置颜色（RGB）
+
+	//
+	// Finally we create the render window which will show up on the screen.
+	// We put our renderer into the render window using AddRenderer. We also
+	// set the size to be 300 pixels by 300.
+	//【通过vtkRenderWindow创建VTK窗口render window，通过AddRenderer，将要在该窗口展示的演员actors的经纪人renderer添加进去】
+	//
+	//vtkRenderWindow* renWin = vtkRenderWindow::New();
+	vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
+	renWin->AddRenderer(ren1); //向VTK窗口加经纪人
+	renWin->SetSize(500, 500);//设置VTK窗口大小，以像素为单位
+
+	//
+	// The vtkRenderWindowInteractor class watches for(等待) events(指令)(e.g., keypress,
+	// mouse) in the vtkRenderWindow. These events are translated into
+	// event invocations（响应） that VTK understands (see VTK/Common/vtkCommand.h
+	// for all events that VTK processes). Then observers of these VTK
+	// events can process them as appropriate.
+	//【通过vtkRenderWindowInteractor实现人机交互，人通过鼠标，键盘输入操作任务，再由vtkRenderWindowInteractor
+	//转化为VTK能识别的响应，对应的observers 就会采取操作】
+	//
+
+	//vtkRenderWindowInteractor* iren = vtkRenderWindowInteractor::New();
+	vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	iren->SetRenderWindow(renWin); //【告诉交互iren ，要操作的renWin这个VTK窗口】
+
+	//
+	// By default the vtkRenderWindowInteractor instantiates an instance
+	// of vtkInteractorStyle. vtkInteractorStyle translates a set of events
+	// it observes into operations on the camera, actors, and/or properties
+	// in the vtkRenderWindow associated with the vtkRenderWinodwInteractor.
+	// Here we specify a particular interactor style.
+	//【不是很理解这个style 控制了哪些，可能是将信息以不同的操作方式转化给camera，actors】
+	//
+	vtkInteractorStyleTrackballCamera* style =
+		vtkInteractorStyleTrackballCamera::New();
+	iren->SetInteractorStyle(style);//【 告诉交互iren，以style方式操作】
+
+	//
+	// Here we use a vtkBoxWidget to transform the underlying coneActor (by
+	// manipulating(操作) its transformation matrix). Many other types of widgets（小部件）
+	// are available for use, see the documentation for more details.
+	//【使用vtkBoxWidget改变coneActor】
+	//
+	// The SetInteractor method is how 3D widgets are associated with the render
+	// window interactor. Internally, SetInteractor sets up a bunch of callbacks
+	// using the Command/Observer mechanism (AddObserver()). The place factor
+	// controls the initial size of the widget with respect to （关于）the bounding box（边界框）
+	// of the input to the widget.
+	//【要先使用SetInteractor 将3D widgets 与交互窗口连接起来。人的操作（点击鼠标，键盘）指令将通过SetInteractor，
+	//发送一系列指令（callbacks回调信号）给对应的AddObserver】
+	//
+
+	vtkBoxWidget* boxWidget = vtkBoxWidget::New();
+	boxWidget->SetInteractor(iren); //【告诉boxWidget要处理的是 iren 这个交互窗口】
+	boxWidget->SetPlaceFactor(1.25);
+
+	//
+	// Place the interactor initially. The input to a 3D widget is used to
+	// initially position（放置）and scale（测量，） the widget. The EndInteractionEvent is
+	// observed which invokes the SelectPolygons callback.
+	//
+	boxWidget->SetProp3D(coneActor); //交互器interactor初始化
+	boxWidget->PlaceWidget();
+	vtkMyCallback* callback = vtkMyCallback::New();
+	boxWidget->AddObserver(vtkCommand::InteractionEvent, callback);
+
+	//
+	// Normally the user presses the "i" key to bring a 3D widget to life. Here
+	// we will manually（手动） enable it so it appears with the cone.
+	//
+	boxWidget->On();
+
+	//
+	// Start the event loop（翻转）.
+	//
+	iren->Initialize(); //交互iren初始化，交互器工作之前必须先调用这个方法进行初始化。
+	iren->Start();     //开始进入事件响应循环，交互器处于等待状态进入事件响应循环之前，必须先调用Initialize()方法。
+
+	//
+	// Free up（释放） any objects we created. All instances in VTK are deleted by
+	// using the Delete() method.
+	//
+	/*cone->Delete();
+	coneMapper->Delete();
+	coneActor->Delete();
+	callback->Delete();
+	boxWidget->Delete();
+	ren1->Delete();
+	renWin->Delete();
+	iren->Delete();
+	style->Delete();*/
+
+	return 0;
+}
+
+
+
+
