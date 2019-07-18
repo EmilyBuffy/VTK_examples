@@ -1,0 +1,66 @@
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+VTK_MODULE_INIT(vtkInteractionStyle);
+
+
+#include<vtkSmartPointer.h>
+#include<vtkImageCanvasSource2D.h>
+#include<vtkImageData.h>
+#include<vtkImageActor.h>
+#include<vtkRenderer.h>
+#include<vtkRenderWindow.h>
+#include<vtkRenderWindowInteractor.h>
+#include<vtkInteractorStyleImage.h>
+//#include < >引用的是编译器类库路径里面的头文件
+//#include" " 引用的是程序目录的相对路径中的头文件
+int main()
+{
+	vtkSmartPointer<vtkImageCanvasSource2D> canvas =
+		vtkSmartPointer<vtkImageCanvasSource2D>::New();
+	canvas->SetScalarTypeToUnsignedChar(); //设置画布的像素数据类型
+	//SetNumberOfScalarComponents则指定了每个像素值的数据成分为1，每个像素值为1个标量值，
+	canvas->SetNumberOfScalarComponents(1);
+	canvas->SetExtent(0, 100, 0, 100, 0, 0);
+	//利用FillBox绘制两个填充矩形,SetDrawColor()来设置两个矩形的颜色。
+	canvas->SetDrawColor(0, 0, 0, 0);
+	canvas->FillBox(0, 100, 0, 100);
+	canvas->SetDrawColor(255, 0, 0, 0);
+	canvas->FillBox(20, 40, 20, 40);
+	canvas->Update();  //这一步还必不可少！ why? 数据流？
+
+	//vtkMapper 不是每个程序所必须的吗？
+	//
+	//创建演员  
+	vtkSmartPointer<vtkImageActor> actor =
+		vtkSmartPointer<vtkImageActor>::New();
+	actor->SetInputData(canvas->GetOutput());
+	//定义视窗
+	double viewport[4] = { 0,0,1,1 }; //？？？
+	vtkSmartPointer<vtkRenderer> renderer =
+		vtkSmartPointer<vtkRenderer>::New();
+	//renderer->SetViewport(viewport);
+	renderer->AddActor(actor);
+	//renderer->ResetCamera();
+	renderer->SetBackground(1.0, 1.0, 1.0);
+
+	//设置渲染窗口（搬上舞台）
+	vtkSmartPointer<vtkRenderWindow> renderwindow =
+		vtkSmartPointer<vtkRenderWindow>::New();
+	renderwindow->AddRenderer(renderer);
+	renderwindow->SetSize(640, 480);
+	renderwindow->Render();//ask each renderer render its images
+	renderwindow->SetWindowName("ImageCanvasSource2D");
+
+	//设置窗口交互（演员-观众）
+	vtkSmartPointer<vtkRenderWindowInteractor> rwi =
+		vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	vtkSmartPointer<vtkInteractorStyleImage> style =
+		vtkSmartPointer<vtkInteractorStyleImage>::New();
+	rwi->SetInteractorStyle(style);
+	rwi->SetRenderWindow(renderwindow);
+
+	rwi->Initialize();
+	rwi->Start();//循环前，必须先初始化	rwi->Initialize();
+
+	return 0;
+}
