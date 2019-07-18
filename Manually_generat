@@ -1,0 +1,78 @@
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+VTK_MODULE_INIT(vtkInteractionStyle);
+
+#include <vtkSmartPointer.h>
+#include <vtkImageData.h>
+#include <vtkImageActor.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyle.h>
+
+#include <vtkInformation.h>
+
+int main()
+{
+	//vtk的新版本在vtkImageData类中取消了SetScalarTypeToUnsignedChar()方法；
+	//现在仅能用如下方法设置：
+	//static void SetScalarType(int, vtkInformation* meta_data);
+	vtkSmartPointer<vtkImageData> img =
+		vtkSmartPointer<vtkImageData>::New();
+	vtkSmartPointer<vtkInformation> info =
+		vtkSmartPointer<vtkInformation>::New();
+	img->SetDimensions(16, 16, 1); //指定图像的维数，图像的原点和像素间隔都采用默认值
+	//指定图像的每个像素值的数据类型为unsigned char
+	img->SetScalarType(VTK_UNSIGNED_CHAR, info); //img->SetScalarTypeToUnsignedChar();
+	//指定图像像素为标量
+	img->SetNumberOfScalarComponents(1, info);//每个像素需要表示的组份 =1是指标量图
+	//分配内存，生成图像数据
+	img->AllocateScalars(info);//很重要
+	//图像生成后，默认所有像素值为0，可以通过访问图像数据数组来设置每个像素值
+
+	unsigned char* ptr = NULL;
+	ptr = (unsigned char*)img->GetScalarPointer();
+	//GetScalarPointer()即返回图像的数据数组（图像数据数组都采用一维数组）
+	//然后根据图像的大小，访问每个像素并为其赋值：0-256
+	for (int i = 0; i < 16 * 16 * 1; i++)
+	{
+		*ptr++ = (i+1000) % 256; //*ptr++ = i % 256; 
+	}
+
+
+	//创建演员
+	vtkSmartPointer<vtkImageActor> actor =
+		vtkSmartPointer<vtkImageActor>::New();
+	actor->SetInputData(img); //actor->SetInputData(canvas->GetOutput());啥区别？
+
+	//启动渲染引擎
+	double viewport[4] = { 0,0,1,1 };
+	vtkSmartPointer<vtkRenderer> render =
+		vtkSmartPointer<vtkRenderer>::New();
+	render->SetViewport(viewport);
+	render->AddActor(actor);
+	render->ResetCamera();
+	render->SetBackground(1, 1, 1);
+
+	//VTK窗口
+	vtkSmartPointer<vtkRenderWindow> window =
+		vtkSmartPointer<vtkRenderWindow>::New();
+	window->AddRenderer(render);
+	window->SetSize(640, 480);
+	window->Render();
+	window->SetWindowName("CreateVTKImageData");
+
+	//交互
+	vtkSmartPointer<vtkRenderWindowInteractor> rwi =
+		vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	vtkSmartPointer<vtkInteractorStyle> style =
+		vtkSmartPointer<vtkInteractorStyle>::New(); //？？不可以直接设置为默认吗
+	rwi->SetInteractorStyle(style);
+	rwi->SetRenderWindow(window);
+
+	rwi->Initialize();
+	rwi->Start();
+
+	return 0;
+}
+
